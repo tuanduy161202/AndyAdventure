@@ -1,0 +1,4 @@
+gif-pygame==1.1.0
+Pillow==10.1.0
+pygame==2.5.2
+pygame-ce==2.3.2
