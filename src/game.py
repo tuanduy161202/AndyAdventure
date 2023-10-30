@@ -62,7 +62,7 @@ class Bullet(pygame.sprite.Sprite):
 class Player(pygame.sprite.Sprite):
     def __init__(self, pos):
         pygame.sprite.Sprite.__init__(self)
-        self.image = pygame.image.load('graphics/player.png')
+        self.image = pygame.image.load('Sprites/Character/player.png')
         self.image = rescaleSprite(self.image, 0.15)
         self.bottom_distance = 40
         self.rect = pygame.Rect(pos[0], pos[1], self.image.get_size()[0], self.image.get_size()[1]+self.bottom_distance)
@@ -132,7 +132,7 @@ class Player(pygame.sprite.Sprite):
 class Enemy(pygame.sprite.Sprite):
     def __init__(self, pos):
         pygame.sprite.Sprite.__init__(self)
-        self.image = pygame.image.load('graphics/player.png')
+        self.image = pygame.image.load('Sprites/Character/player.png')
         self.image = rescaleSprite(self.image, 0.15)
         self.bottom_distance = 40
         self.rect = pygame.Rect(pos[0], pos[1], self.image.get_size()[0], self.image.get_size()[1]+self.bottom_distance)
