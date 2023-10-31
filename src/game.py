@@ -8,8 +8,10 @@ from pygame.locals import (
     K_LEFT,
     K_RIGHT,
     K_ESCAPE,
+    K_BACKSPACE,
     KEYDOWN,
     QUIT,
+    MOUSEBUTTONDOWN,
 )
 
 SCREEN_WIDTH = 1280
@@ -155,7 +157,8 @@ class Player(pygame.sprite.Sprite):
     def hurted(self, dam):
         self.hp -= dam
         if self.hp <= 0:
-            pass
+            return True
+        return False
     def upgrade(self, addbullet):
         self.num_bullets += addbullet
         if self.num_bullets > 5:
@@ -324,11 +327,8 @@ class Boss(pygame.sprite.Sprite):
         self.hp -= dam
         if self.hp <= 0:
             self.kill()
-            if random.randint(0, 10) == 9:
-                return AddBullet((self.rect.left, self.rect.top))
-            else:
-                return Coin((self.rect.left, self.rect.top))
-        return None
+            return True
+        return False
     def trans_screen(self, dx):
         self.rect.move_ip(-dx, 0)
 
@@ -408,7 +408,6 @@ class Game:
     def __init__(self, screen):
         self.screen = screen
         self.player = Player((0, 0))
-        
         self.coin_score = Score('Sprites/Items/coin1.png', 4*0.09*SCREEN_HEIGHT, 0.09*SCREEN_HEIGHT, (0, 0.1*SCREEN_HEIGHT))
         self.p_bullets = pygame.sprite.Group()
         self.e_bullets = pygame.sprite.Group()
@@ -422,7 +421,6 @@ class Game:
 
         self.all_sprites.add(self.left_boundary)
         self.all_sprites.add(self.right_boundary)
-
         self.p_health = PlayerHealth()
         self.b_health = BossHealth()
         for i in range(self.num_enemy):
@@ -435,7 +433,21 @@ class Game:
                 self.ladders.add(ladder)
                 self.all_sprites.add(ladder)
         self.isBossAppeared = False
+        self.isPaused = False
+        self.gameOver = False
+        self.victory = False
     def update(self, pressed_keys):
+
+        ## Pause game
+        if pressed_keys[K_DOWN]:
+            self.isPaused = not self.isPaused
+            font = pygame.font.SysFont("Arial", 50)
+            textSurf = font.render('      PAUSED\n\nPress DOWN to continue', 2, (255,255,255))
+            self.screen.blit(textSurf, [500, 250])
+        if self.isPaused:
+            return None, 0
+
+        ## Player & Enemy fire
         p_bullet = self.player.fire()
         if p_bullet:
             self.p_bullets.add(p_bullet)
@@ -466,12 +478,12 @@ class Game:
             boss_hurted = pygame.sprite.spritecollide(self.boss,self.p_bullets,False)
             if boss_hurted:
                 for bullet in boss_hurted:
-                    self.boss.hurted(bullet.damage)
+                    self.victory = self.boss.hurted(bullet.damage)
                     bullet.kill()
             self.b_health.update(self.boss.hp)
         if player_bullet:
             for bullet in player_bullet:
-                self.player.hurted(bullet.damage)
+                self.gameOver = self.player.hurted(bullet.damage)
                 bullet.kill()
         if player_collide:
             for lad in player_collide:
@@ -522,48 +534,219 @@ class Game:
         self.p_bullets.draw(self.screen)
         self.e_bullets.draw(self.screen)
         self.enemies.draw(self.screen)
-
-##class Menu:
-##    class NewGame(pygame.sprite.Sprite):
-##        def __init__(self):
-##            pygame.sprite.Sprite.__init__(self)
-##            self.image = pygame.Surface((1280, 800))
-##            self.rect = pygame.Rect(0, 0, self.width, self.height)
-##            self.hp_bar = pygame.Surface((500, self.height-10))
-##            self.icon = pygame.image.load('Sprites/Character/player.png')
-##            self.icon = rescaleSprite(self.icon, self.height / SCREEN_HEIGHT)
-##
-##            self.font = pygame.font.SysFont("Arial", )
-##            self.color = (255, 255, 255)
-##            self.icon = pygame.image.load(sprite_img)
-##            self.icon = rescaleSprite(self.icon, height / SCREEN_HEIGHT)
-##            self.textSurf = self.font.render('x0', 1, self.color)
-##        def update(self, hp):
-##            self.image.fill((0, 0, 0))
-##            self.image.blit(self.icon, [0, 0])
-##            self.hp_bar = pygame.Surface(((hp*5 if hp > 0 else 0), self.height-10))
-##            self.hp_bar.fill((0, 255, 0))
-##            self.image.blit(self.hp_bar, [self.icon.get_width()+1, 5])
-##    def __init__(self, screen):
-##        self.screen = screen
-##        self.screen
+        score = self.coin_score.score * 20 + max(self.player.hp, 0) + 100
+        if self.victory:
+            return score, 1
+        if self.gameOver:
+            return score, -1
+        return None, 0
+class Menu:
+    class NewGame(pygame.sprite.Sprite):
+        def __init__(self):
+            pygame.sprite.Sprite.__init__(self)
+            self.image = pygame.Surface((300, 50))
+            self.rect = pygame.Rect(490, 150, 300, 50)
+            self.font = pygame.font.SysFont("Arialblack", 50)
+            self.color = (255, 255, 255)
+            self.textSurf = self.font.render('New Game', 2, self.color)
+            self.image.fill((88, 88, 88))
+            self.image.blit(self.textSurf, self.textSurf.get_rect(center = (150, 25)))
+        def update(self):
+            pass
+    class Quit(pygame.sprite.Sprite):
+        def __init__(self):
+            pygame.sprite.Sprite.__init__(self)
+            self.image = pygame.Surface((300, 50))
+            self.rect = pygame.Rect(490, 300, 300, 50)
+            self.font = pygame.font.SysFont("Arialblack", 50)
+            self.color = (255, 255, 255)
+            self.textSurf = self.font.render('Quit', 2, self.color)
+            self.image.fill((88, 88, 88))
+            self.image.blit(self.textSurf, self.textSurf.get_rect(center = (150, 25)))
+        def update(self):
+            pass
+    def __init__(self, screen):
+        self.screen = screen
+        background = pygame.image.load('Sprites/Menu/background.png')
+        background = rescaleSprite(background, 1)
+        self.newgame = self.NewGame()
+        self.quit = self.Quit()
+        self.screen.blit(background, background.get_rect(topleft = (0, 0)))
+        self.screen.blit(self.newgame.image, self.newgame.rect)
+        self.screen.blit(self.quit.image, self.quit.rect)
+    def update(self):
+        pass
+class GameOver:
+    class GoToMenu(pygame.sprite.Sprite):
+        def __init__(self):
+            pygame.sprite.Sprite.__init__(self)
+            self.image = pygame.Surface((310, 50))
+            self.rect = pygame.Rect(485, 400, 300, 50)
+            self.font = pygame.font.SysFont("Arialblack", 50)
+            self.color = (0, 0, 0)
+            self.textSurf = self.font.render('Go to Menu', 2, self.color)
+            self.image.fill((125, 125, 125))
+            self.image.blit(self.textSurf, self.textSurf.get_rect(center = (155, 25)))
+        def update(self):
+            pass
+    class Quit(pygame.sprite.Sprite):
+        def __init__(self):
+            pygame.sprite.Sprite.__init__(self)
+            self.image = pygame.Surface((310, 50))
+            self.rect = pygame.Rect(485, 500, 300, 50)
+            self.font = pygame.font.SysFont("Arialblack", 50)
+            self.color = (0, 0, 0)
+            self.textSurf = self.font.render('Quit', 2, self.color)
+            self.image.fill((125, 125, 125))
+            self.image.blit(self.textSurf, self.textSurf.get_rect(center = (155, 25)))
+        def update(self):
+            pass
+    class Title(pygame.sprite.Sprite):
+        def __init__(self):
+            pygame.sprite.Sprite.__init__(self)
+            self.image = pygame.Surface((600, 100))
+            self.rect = pygame.Rect(340, 40, 600, 100)
+            self.font = pygame.font.SysFont("Arialblack", 80)
+            self.color = (255, 255, 0)
+            self.textSurf = self.font.render('GAME OVER', 2, self.color)
+            self.image.fill((125, 125, 125))
+            self.image.blit(self.textSurf, self.textSurf.get_rect(center = (300, 50)))
+        def update(self):
+            pass
+    class FinalScore(pygame.sprite.Sprite):
+        def __init__(self, score = 0):
+            pygame.sprite.Sprite.__init__(self)
+            self.image = pygame.Surface((600, 100))
+            self.rect = pygame.Rect(340, 200, 600, 100)
+            self.font = pygame.font.SysFont("Arialblack", 70)
+            self.color = (255, 255, 255)
+            self.textSurf = self.font.render(f'Score: {score}', 2, self.color)
+            self.image.fill((125, 125, 125))
+            self.image.blit(self.textSurf, self.textSurf.get_rect(center = (300, 50)))
+        def update(self):
+            pass
+    def __init__(self, screen, score = 0):
+        self.screen = screen
+        self.frame = pygame.Surface((600, 600))
+        self.frame.fill((125, 125, 125))
+        self.go2menu = self.GoToMenu()
+        self.quit = self.Quit()
+        self.title = self.Title()
+        self.score = self.FinalScore(score)
+        self.screen.blit(self.frame, self.frame.get_rect(center = (640, 320)))
+        self.screen.blit(self.score.image, self.score.rect)
+        self.screen.blit(self.title.image, self.title.rect)
+        self.screen.blit(self.go2menu.image, self.go2menu.rect)
+        self.screen.blit(self.quit.image, self.quit.rect)
+    def update(self):
+        pass
+        
+class Victory:
+    class GoToMenu(pygame.sprite.Sprite):
+        def __init__(self):
+            pygame.sprite.Sprite.__init__(self)
+            self.image = pygame.Surface((310, 50))
+            self.rect = pygame.Rect(485, 400, 300, 50)
+            self.font = pygame.font.SysFont("Arialblack", 50)
+            self.color = (0, 0, 0)
+            self.textSurf = self.font.render('Go to Menu', 2, self.color)
+            self.image.fill((125, 125, 125))
+            self.image.blit(self.textSurf, self.textSurf.get_rect(center = (155, 25)))
+        def update(self):
+            pass
+    class Quit(pygame.sprite.Sprite):
+        def __init__(self):
+            pygame.sprite.Sprite.__init__(self)
+            self.image = pygame.Surface((310, 50))
+            self.rect = pygame.Rect(485, 500, 300, 50)
+            self.font = pygame.font.SysFont("Arialblack", 50)
+            self.color = (0, 0, 0)
+            self.textSurf = self.font.render('Quit', 2, self.color)
+            self.image.fill((125, 125, 125))
+            self.image.blit(self.textSurf, self.textSurf.get_rect(center = (155, 25)))
+        def update(self):
+            pass
+    class Title(pygame.sprite.Sprite):
+        def __init__(self):
+            pygame.sprite.Sprite.__init__(self)
+            self.image = pygame.Surface((600, 100))
+            self.rect = pygame.Rect(340, 40, 600, 100)
+            self.font = pygame.font.SysFont("Arialblack", 80)
+            self.color = (255, 255, 0)
+            self.textSurf = self.font.render('VICTORY', 2, self.color)
+            self.image.fill((125, 125, 125))
+            self.image.blit(self.textSurf, self.textSurf.get_rect(center = (300, 50)))
+        def update(self):
+            pass
+    class FinalScore(pygame.sprite.Sprite):
+        def __init__(self, score = 0):
+            pygame.sprite.Sprite.__init__(self)
+            self.image = pygame.Surface((600, 100))
+            self.rect = pygame.Rect(340, 200, 600, 100)
+            self.font = pygame.font.SysFont("Arialblack", 70)
+            self.color = (255, 255, 255)
+            self.textSurf = self.font.render(f'Score: {score}', 2, self.color)
+            self.image.fill((125, 125, 125))
+            self.image.blit(self.textSurf, self.textSurf.get_rect(center = (300, 50)))
+        def update(self):
+            pass
+    def __init__(self, screen, score = 0):
+        self.screen = screen
+        self.frame = pygame.Surface((600, 600))
+        self.frame.fill((125, 125, 125))
+        self.go2menu = self.GoToMenu()
+        self.quit = self.Quit()
+        self.title = self.Title()
+        self.score = self.FinalScore(score)
+        self.screen.blit(self.frame, self.frame.get_rect(center = (640, 320)))
+        self.screen.blit(self.score.image, self.score.rect)
+        self.screen.blit(self.title.image, self.title.rect)
+        self.screen.blit(self.go2menu.image, self.go2menu.rect)
+        self.screen.blit(self.quit.image, self.quit.rect)
+    def update(self):
+        pass
 
 pygame.init()
 
 screen = pygame.display.set_mode([SCREEN_WIDTH, SCREEN_HEIGHT])
 pygame.display.set_caption("ANDY'S ADVENTURE")
 clock = pygame.time.Clock()
-game = Game(screen)
-##menu = Menu()
+menu = Menu(screen)
+game = None
+gameover = None
+vict = None
 running = True
 inGame = False
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-    
-    pressed_keys = pygame.key.get_pressed()
-    game.update(pressed_keys)
+        elif event.type == MOUSEBUTTONDOWN:
+            if menu and menu.newgame.rect.collidepoint(event.pos):
+                inGame = True
+                game = Game(screen)
+                menu = None
+            elif menu and menu.quit.rect.collidepoint(event.pos):
+                running = False
+            elif gameover and gameover.go2menu.rect.collidepoint(event.pos):
+                screen.fill((0, 0, 0))
+                menu = Menu(screen)
+            elif gameover and gameover.quit.rect.collidepoint(event.pos):
+                running = False
+            elif vict and vict.go2menu.rect.collidepoint(event.pos):
+                screen.fill((0, 0, 0))
+                menu = Menu(screen)
+            elif vict and vict.quit.rect.collidepoint(event.pos):
+                running = False
+    if inGame:
+        pressed_keys = pygame.key.get_pressed()
+        score, success = game.update(pressed_keys)
+        if success == -1:
+            gameover = GameOver(screen = screen, score = score)
+            inGame = False
+        elif success == 1:
+            vict = Victory(screen = screen, score = score)
+            inGame = False
     pygame.display.flip()
     clock.tick(30)
 pygame.quit()
