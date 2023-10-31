@@ -30,13 +30,13 @@ class Coin(pygame.sprite.Sprite):
     def __init__(self, pos):
         pygame.sprite.Sprite.__init__(self)
         self.image = pygame.image.load('Sprites/Items/coin1.png')
-        self.image = rescaleSprite(self.image, 0.2)
+        self.image = rescaleSprite(self.image, 0.1)
         self.rect = self.image.get_rect(topleft = pos)
         self.count = 0
     def update(self):
         self.count = (self.count + 1)%8 + 1
         self.image = pygame.image.load(f'Sprites/Items/coin{self.count}.png')
-        self.image = rescaleSprite(self.image, 0.2)
+        self.image = rescaleSprite(self.image, 0.1)
     def draw(self, surface):
         self.image.render(surface, self.rect)
     def trans_screen(self, dx):
@@ -48,7 +48,7 @@ class Bullet(pygame.sprite.Sprite):
         self.image = rescaleSprite(self.image, 0.02)
         self.rect = self.image.get_rect(topleft = pos)
         self.damage = 10
-        self.velocity = 10
+        self.velocity = 15
         self.direct = direct
     def update(self):
         d = math.sqrt(self.direct[0]**2 + self.direct[1]**2)
@@ -74,6 +74,7 @@ class Player(pygame.sprite.Sprite):
         self.isFall = False
         self.num_bullets = 1
         self.delta_angle = 30
+        self.hp = 100
         
     def update(self, pressed_keys):
         if pressed_keys[K_RIGHT]:
@@ -117,7 +118,7 @@ class Player(pygame.sprite.Sprite):
     def fire(self):
         self.bulletCounter = (self.bulletCounter + 1) % P_BULLET_DELAY
         if self.bulletCounter == 0:
-            pos = (self.rect.left + self.rect.right)//2, (self.rect.top + self.rect.bottom) // 2
+            pos = (self.rect.left + self.rect.right)//2, (self.rect.top + self.rect.bottom - self.bottom_distance) // 2
             bullets = pygame.sprite.Group()
             b = Bullet(pos, self.direct)
             bullets.add(b)
@@ -132,7 +133,7 @@ class Player(pygame.sprite.Sprite):
 class Enemy(pygame.sprite.Sprite):
     def __init__(self, pos):
         pygame.sprite.Sprite.__init__(self)
-        self.image = pygame.image.load('Sprites/Character/player.png')
+        self.image = pygame.image.load('Sprites/Monsters/enemy.png')
         self.image = rescaleSprite(self.image, 0.15)
         self.bottom_distance = 40
         self.rect = pygame.Rect(pos[0], pos[1], self.image.get_size()[0], self.image.get_size()[1]+self.bottom_distance)
@@ -191,7 +192,7 @@ class Enemy(pygame.sprite.Sprite):
     def fire(self):
         self.bulletCounter = (self.bulletCounter + 1) % E_BULLET_DELAY
         if self.bulletCounter == 0:
-            pos = (self.rect.left + self.rect.right)//2, (self.rect.top + self.rect.bottom) // 2
+            pos = (self.rect.left + self.rect.right)//2, (self.rect.top + self.rect.bottom - self.bottom_distance) // 2
             # pos = self.rect.left, self.rect.top
             if random.randint(0, 2) == 1:
                 b = Bullet(pos, self.direct)
@@ -225,19 +226,41 @@ class Boundary(pygame.sprite.Sprite):
     def trans_screen(self, dx):
         self.rect.move_ip(-dx, 0)
         
-
+class Score(pygame.sprite.Sprite):
+    def __init__(self, sprite_img, width, height, pos):
+        # Call the parent class (Sprite) constructor
+        self.score = 0
+        width = int(width)
+        height = int(height)
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.Surface((width, height))
+        self.rect = pygame.Rect(pos[0], pos[1], width, height)
+        self.W = width
+        self.H = height
+        self.font = pygame.font.SysFont("Arial", height)
+        self.color = (255, 255, 255)
+        self.icon = pygame.image.load(sprite_img)
+        self.icon = rescaleSprite(self.icon, height / SCREEN_HEIGHT)
+        self.textSurf = self.font.render('x0', 1, self.color)
+    def update(self):
+        self.textSurf = self.font.render(f'x{self.score}', 1, self.color)
+        self.image.fill((0, 0, 0))
+        self.image.blit(self.icon, [0, 0])
+        self.image.blit(self.textSurf, [self.icon.get_width()+1, 0])
 pygame.init()
 
 screen = pygame.display.set_mode([SCREEN_WIDTH, SCREEN_HEIGHT])
+pygame.display.set_caption("ANDY'S ADVENTURE")
 player = Player((0, 0))
 running = True
 clock = pygame.time.Clock()
+coin_score = Score('Sprites/Items/coin1.png', 4*0.09*SCREEN_HEIGHT, 0.09*SCREEN_HEIGHT, (0, 0))
 p_bullets = pygame.sprite.Group()
 e_bullets = pygame.sprite.Group()
 enemies = pygame.sprite.Group()
 ladders = pygame.sprite.Group()
 items = pygame.sprite.Group()
-
+num_enemy = 40
 all_sprites = pygame.sprite.Group()
 left_boundary = Boundary((-10, 0), 20, SCREEN_HEIGHT)
 right_boundary = Boundary((MAX_WIDTH-10, 0), 20, SCREEN_HEIGHT)
@@ -246,8 +269,8 @@ all_sprites.add(left_boundary)
 all_sprites.add(right_boundary)
 
 
-for i in range(4):
-    enemy = Enemy((random.randint(0, SCREEN_WIDTH), random.randint(0, SCREEN_HEIGHT)))
+for i in range(num_enemy):
+    enemy = Enemy((random.randint(0, MAX_WIDTH), random.randint(0, SCREEN_HEIGHT)))
     enemies.add(enemy)
     all_sprites.add(enemy)
 for i in range(0, MAX_WIDTH, SCREEN_WIDTH):
@@ -276,6 +299,7 @@ while running:
     enemy_collide = pygame.sprite.groupcollide(enemies,p_bullets,False, True)
     enemy_falls = pygame.sprite.groupcollide(enemies,ladders,False, False)
     player_collide = pygame.sprite.spritecollide(player,ladders,False)
+    
     player.update(pressed_keys)
     if player_collide:
         for lad in player_collide:
@@ -299,8 +323,15 @@ while running:
             if item:
                 items.add(item)
                 all_sprites.add(item)
+    pcoin_collide = pygame.sprite.spritecollide(player,items,False)
+    if pcoin_collide:
+        for coin in pcoin_collide:
+            coin.kill()
+            coin_score.score += 1
+    coin_score.update()
     screen.fill((0, 0, 0))
     
+    screen.blit(coin_score.image, coin_score.rect)
     screen.blit(player.image, player.rect)
     screen.blit(left_boundary.image, left_boundary.rect)
     screen.blit(right_boundary.image, right_boundary.rect)
