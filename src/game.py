@@ -458,18 +458,21 @@ class Game:
                 self.e_bullets.add(e_bullet)
                 self.all_sprites.add(e_bullet)
         self.enemies.update(player_rect = self.player.rect)
-        enemy_collide = pygame.sprite.groupcollide(self.enemies,self.p_bullets,False, True)
-        enemy_falls = pygame.sprite.groupcollide(self.enemies,self.ladders,False, False)
-        player_collide = pygame.sprite.spritecollide(self.player,self.ladders,False)
-        player_bullet = pygame.sprite.spritecollide(self.player,self.e_bullets,False)
+
+        ## Va cham
+        enemy_collide = pygame.sprite.groupcollide(self.enemies,self.p_bullets,False, True) # enemy vs player_bullet
+        enemy_falls = pygame.sprite.groupcollide(self.enemies,self.ladders,False, False) # enemy vs ladder
+        player_collide = pygame.sprite.spritecollide(self.player,self.ladders,False) # player vs ladder
+        player_bullet = pygame.sprite.spritecollide(self.player,self.e_bullets,False) # player vs enemy_bullet
 
         self.player.update(pressed_keys)
 
-        if len(self.enemies.sprites()) == 0 and not self.isBossAppeared:
+        
+        if len(self.enemies.sprites()) == 0 and not self.isBossAppeared: # Tao boss
             self.isBossAppeared = True
             self.boss = Boss((SCREEN_WIDTH - 100, 0))
             self.all_sprites.add(self.boss)
-        if self.isBossAppeared:
+        if self.isBossAppeared: # Xu ly boss
             self.boss.update(player_rect = self.player.rect)
             e_bullet = self.boss.fire()
             if e_bullet:
@@ -481,38 +484,42 @@ class Game:
                     self.victory = self.boss.hurted(bullet.damage)
                     bullet.kill()
             self.b_health.update(self.boss.hp)
-        if player_bullet:
+
+        # Xu ly va cham
+        if player_bullet: # player vs enemy_bullet
             for bullet in player_bullet:
                 self.gameOver = self.player.hurted(bullet.damage)
                 bullet.kill()
-        if player_collide:
+        if player_collide: # player vs ladder
             for lad in player_collide:
                 self.player.fall(lad)
-        if enemy_falls:
+        if enemy_falls:  # enemy vs ladder
             for res in enemy_falls:
                 res.fall(enemy_falls[res][0])
-        if self.player.rect.left > SCREEN_WIDTH // 2 and self.right_boundary.rect.left + 10 > (SCREEN_WIDTH):
+        if self.player.rect.left > SCREEN_WIDTH // 2 and self.right_boundary.rect.left + 10 > (SCREEN_WIDTH): # chuyen canh khi player di sang phai
             dx = self.player.rect.left - (SCREEN_WIDTH // 2)
             for sprite in self.all_sprites.sprites():
                 sprite.trans_screen(dx)
             self.player.rect.left = SCREEN_WIDTH // 2
-        elif self.player.rect.left < 10 and self.left_boundary.rect.left+10 < 0:
+        elif self.player.rect.left < 10 and self.left_boundary.rect.left+10 < 0: # chuyen canh khi player di sang trai
             dx = self.player.rect.left - 10
             for sprite in self.all_sprites.sprites():
                 sprite.trans_screen(dx)
             self.player.rect.left = 10
-        if enemy_collide:
+        if enemy_collide: # enemy vs player_bullet
             for res in enemy_collide:
                 item = res.hurted(enemy_collide[res][0].damage)
                 if item:
                     self.items.add(item)
                     self.all_sprites.add(item)
-        pitem_collide = pygame.sprite.spritecollide(self.player,self.items,False)
+        
+        pitem_collide = pygame.sprite.spritecollide(self.player,self.items,False) # player vs item
         if pitem_collide:
             for item in pitem_collide:
                 self.coin_score.score += item.score
                 self.player.upgrade(item.addbullet)
                 item.kill()
+        #### Update
         self.p_bullets.update()
         self.e_bullets.update()
         self.items.update()
