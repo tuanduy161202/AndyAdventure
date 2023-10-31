@@ -33,10 +33,32 @@ class Coin(pygame.sprite.Sprite):
         self.image = rescaleSprite(self.image, 0.1)
         self.rect = self.image.get_rect(topleft = pos)
         self.count = 0
+        self.score = 1
+        self.addbullet = 0
     def update(self):
         self.count = (self.count + 1)%8 + 1
         self.image = pygame.image.load(f'Sprites/Items/coin{self.count}.png')
         self.image = rescaleSprite(self.image, 0.1)
+    def draw(self, surface):
+        self.image.render(surface, self.rect)
+    def trans_screen(self, dx):
+        self.rect.move_ip(-dx, 0)
+class AddBullet(pygame.sprite.Sprite):
+    def __init__(self, pos):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.image.load('Sprites/Bullets/bullet.png')
+        self.image = rescaleSprite(self.image, 0.05)
+        self.image = pygame.transform.rotate(self.image, 45)
+        self.rect = self.image.get_rect(topleft = pos)
+        self.count = 1
+        self.score = 0
+        self.addbullet = 2
+    def update(self):
+        self.count = (self.count + 1) % 2
+        if self.count == 0:
+            self.rect.move_ip(0, -1)
+        else:
+            self.rect.move_ip(0, 1)
     def draw(self, surface):
         self.image.render(surface, self.rect)
     def trans_screen(self, dx):
@@ -73,7 +95,7 @@ class Player(pygame.sprite.Sprite):
         self.bottom_limit = SCREEN_HEIGHT
         self.isFall = False
         self.num_bullets = 1
-        self.delta_angle = 30
+        self.delta_angle = 15
         self.hp = 100
         
     def update(self, pressed_keys):
@@ -129,7 +151,14 @@ class Player(pygame.sprite.Sprite):
                 bullets.add(b)
             return bullets
         return None
-
+    def hurted(self, dam):
+        self.hp -= dam
+        if self.hp <= 0:
+            pass
+    def upgrade(self, addbullet):
+        self.num_bullets += addbullet
+        if self.num_bullets > 5:
+            self.num_bullets = 5
 class Enemy(pygame.sprite.Sprite):
     def __init__(self, pos):
         pygame.sprite.Sprite.__init__(self)
@@ -157,9 +186,11 @@ class Enemy(pygame.sprite.Sprite):
         if choice == 0:
             self.rect.move_ip(3, 0)
             self.direct = (1, 0)
+            
         elif choice == 1:
             self.rect.move_ip(-3, 0)
             self.direct = (-1, 0)
+            
         if (not self.isJump) and choice == 2:
             self.isJump = True
             self.vJump = V_JUMP
@@ -202,7 +233,10 @@ class Enemy(pygame.sprite.Sprite):
         self.hp -= dam
         if self.hp <= 0:
             self.kill()
-            return Coin((self.rect.left, self.rect.top))
+            if random.randint(0, 10) == 9:
+                return AddBullet((self.rect.left, self.rect.top))
+            else:
+                return Coin((self.rect.left, self.rect.top))
         return None
     def trans_screen(self, dx):
         self.rect.move_ip(-dx, 0)
@@ -228,7 +262,6 @@ class Boundary(pygame.sprite.Sprite):
         
 class Score(pygame.sprite.Sprite):
     def __init__(self, sprite_img, width, height, pos):
-        # Call the parent class (Sprite) constructor
         self.score = 0
         width = int(width)
         height = int(height)
@@ -247,6 +280,25 @@ class Score(pygame.sprite.Sprite):
         self.image.fill((0, 0, 0))
         self.image.blit(self.icon, [0, 0])
         self.image.blit(self.textSurf, [self.icon.get_width()+1, 0])
+class PlayerHealth(pygame.sprite.Sprite):
+    def __init__(self):
+        pygame.sprite.Sprite.__init__(self)
+        self.height = int(0.09*SCREEN_HEIGHT)
+        self.width = 500 + self.height
+        self.image = pygame.Surface((self.width, self.height))
+        self.rect = pygame.Rect(0, 0, self.width, self.height)
+        self.hp_bar = pygame.Surface((500, self.height-10))
+        
+##        self.font = pygame.font.SysFont("Arial", height)
+##        self.color = (255, 255, 255)
+        self.icon = pygame.image.load('Sprites/Character/player.png')
+        self.icon = rescaleSprite(self.icon, self.height / SCREEN_HEIGHT)
+    def update(self, hp):
+        self.image.fill((0, 0, 0))
+        self.image.blit(self.icon, [0, 0])
+        self.hp_bar = pygame.Surface(((hp*5 if hp > 0 else 0), self.height-10))
+        self.hp_bar.fill((0, 255, 0))
+        self.image.blit(self.hp_bar, [self.icon.get_width()+1, 5])
 pygame.init()
 
 screen = pygame.display.set_mode([SCREEN_WIDTH, SCREEN_HEIGHT])
@@ -254,7 +306,7 @@ pygame.display.set_caption("ANDY'S ADVENTURE")
 player = Player((0, 0))
 running = True
 clock = pygame.time.Clock()
-coin_score = Score('Sprites/Items/coin1.png', 4*0.09*SCREEN_HEIGHT, 0.09*SCREEN_HEIGHT, (0, 0))
+coin_score = Score('Sprites/Items/coin1.png', 4*0.09*SCREEN_HEIGHT, 0.09*SCREEN_HEIGHT, (0, 0.1*SCREEN_HEIGHT))
 p_bullets = pygame.sprite.Group()
 e_bullets = pygame.sprite.Group()
 enemies = pygame.sprite.Group()
@@ -268,6 +320,7 @@ right_boundary = Boundary((MAX_WIDTH-10, 0), 20, SCREEN_HEIGHT)
 all_sprites.add(left_boundary)
 all_sprites.add(right_boundary)
 
+p_health = PlayerHealth()
 
 for i in range(num_enemy):
     enemy = Enemy((random.randint(0, MAX_WIDTH), random.randint(0, SCREEN_HEIGHT)))
@@ -299,8 +352,12 @@ while running:
     enemy_collide = pygame.sprite.groupcollide(enemies,p_bullets,False, True)
     enemy_falls = pygame.sprite.groupcollide(enemies,ladders,False, False)
     player_collide = pygame.sprite.spritecollide(player,ladders,False)
-    
+    player_bullet = pygame.sprite.spritecollide(player,e_bullets,False)
     player.update(pressed_keys)
+    if player_bullet:
+        for bullet in player_bullet:
+            player.hurted(bullet.damage)
+            bullet.kill()
     if player_collide:
         for lad in player_collide:
             player.fall(lad)
@@ -323,15 +380,19 @@ while running:
             if item:
                 items.add(item)
                 all_sprites.add(item)
-    pcoin_collide = pygame.sprite.spritecollide(player,items,False)
-    if pcoin_collide:
-        for coin in pcoin_collide:
-            coin.kill()
-            coin_score.score += 1
+    pitem_collide = pygame.sprite.spritecollide(player,items,False)
+    if pitem_collide:
+        for item in pitem_collide:
+            coin_score.score += item.score
+            player.upgrade(item.addbullet)
+            item.kill()
+            
+    p_health.update(player.hp)
     coin_score.update()
     screen.fill((0, 0, 0))
     
     screen.blit(coin_score.image, coin_score.rect)
+    screen.blit(p_health.image, p_health.rect)
     screen.blit(player.image, player.rect)
     screen.blit(left_boundary.image, left_boundary.rect)
     screen.blit(right_boundary.image, right_boundary.rect)
@@ -340,6 +401,7 @@ while running:
     p_bullets.draw(screen)
     e_bullets.draw(screen)
     enemies.draw(screen)
+    
     pygame.display.flip()
     clock.tick(30)
 
